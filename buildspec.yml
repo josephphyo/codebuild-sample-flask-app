@@ -1,0 +1,29 @@
+version: 0.2
+
+
+phases:
+  pre_build:
+    commands:
+      - echo Amazon ECR Logging......
+      - aws --version
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+      - REPOSITORY_URI=123456789123.dkr.ecr.ap-southeast-1.amazonaws.com/repo-name
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+  build:
+    commands:
+      - echo Build started - `date`
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build Completed - `date`
+      - echo Pushing the Docker images to Amazon ECR...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image information file...
+      - printf '[{"name":"pmh-small-flaskapp-demo","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > image-information.json
+      - cat image-information.json 
+artifacts:
+    files: image-information.json
